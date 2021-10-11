@@ -3,7 +3,9 @@ package com.example.springbootdemo.service;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.example.springbootdemo.util.HttpUtils;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.internal.StringUtil;
@@ -21,6 +23,7 @@ public class DataService {
     String fundResult = HttpUtils.get(fundUrl);
     fundResult = fundResult.substring(fundResult.indexOf("["), fundResult.lastIndexOf("]")+1);
     List<List> fundArray = JSONUtil.toList(fundResult, List.class);
+    Map<String, Integer> postMap = new HashMap<>();
     for(List list: fundArray){
       String fundCode = (String) list.get(0);
       String codeUrl = "http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=" + fundCode
@@ -36,18 +39,26 @@ public class DataService {
         for (int i=0; i<elements.size(); i++) {
           Element element = elements.get(i);
           if (i == 0) {
-            log.info("==============fund name is:{}==============", element.html());
+            String name = element.html();
+            log.info("==============fund name is:{}==============", name);
           }
           //log.info("---------i:{}---------", i);
           if ((i - 2) % 6 == 0) {
             j++;
+            Integer total = postMap.get(element.html());
+            if(total == null || total == 0){
+              total = 1;
+            }else{
+              total++;
+            }
+            postMap.put(element.html(), total);
             log.info("---------post name is:{}---------", element.html());
           }
           if(j==10){
             break;
           }
         }
-        //System.out.println("--------begin:" + elements + "----------end");
+        log.info("**************total is:{}****************", postMap);
       }
     }
     //log.info(JSONUtil.toJsonStr(fundArray));
