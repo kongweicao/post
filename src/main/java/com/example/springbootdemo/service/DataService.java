@@ -32,18 +32,22 @@ public class DataService {
       if(!StringUtil.isBlank(content)) {
         Document document = Jsoup.parse(content);
         Elements elements = document.getElementsByTag("a");
-        int i = 0;
-        for (Element element : elements) {
+        int j=0;
+        for (int i=0; i<elements.size(); i++) {
+          Element element = elements.get(i);
           if (i == 0) {
-            log.info("---------fund name is:{}---------", element.html());
+            log.info("==============fund name is:{}==============", element.html());
           }
-          log.info("---------i:{}---------", i);
+          //log.info("---------i:{}---------", i);
           if ((i - 2) % 6 == 0) {
+            j++;
             log.info("---------post name is:{}---------", element.html());
           }
-          i++;
+          if(j==10){
+            break;
+          }
         }
-        System.out.println("--------begin:" + elements + "----------end");
+        //System.out.println("--------begin:" + elements + "----------end");
       }
     }
     //log.info(JSONUtil.toJsonStr(fundArray));
