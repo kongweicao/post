@@ -6,11 +6,12 @@ import com.example.springbootdemo.util.HttpUtils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.internal.StringUtil;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
@@ -23,44 +24,49 @@ public class DataService {
     String fundResult = HttpUtils.get(fundUrl);
     fundResult = fundResult.substring(fundResult.indexOf("["), fundResult.lastIndexOf("]")+1);
     List<List> fundArray = JSONUtil.toList(fundResult, List.class);
-    Map<String, Integer> postMap = new HashMap<>();
-    for(List list: fundArray){
-      String fundCode = (String) list.get(0);
-      String codeUrl = "http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=" + fundCode
-          + "&topline=10&year=2021&month=";
-      String postResult = HttpUtils.get(codeUrl);
-      postResult = postResult.substring(postResult.indexOf("{"), postResult.lastIndexOf("}")+1);
-      JSONObject postObject = JSONUtil.parseObj(postResult);
-      String content = postObject.getStr("content");
-      if(!StringUtil.isBlank(content)) {
-        Document document = Jsoup.parse(content);
-        Elements elements = document.getElementsByTag("a");
-        int j=0;
-        for (int i=0; i<elements.size(); i++) {
-          Element element = elements.get(i);
-          if (i == 0) {
-            String name = element.html();
-            log.info("==============fund name is:{}==============", name);
-          }
-          //log.info("---------i:{}---------", i);
-          if ((i - 2) % 6 == 0) {
-            j++;
-            Integer total = postMap.get(element.html());
-            if(total == null || total == 0){
-              total = 1;
-            }else{
-              total++;
+    ConcurrentHashMap<String, Integer> postMap = new ConcurrentHashMap<>();
+    fundArray.parallelStream().forEach(
+        list -> {
+          String fundCode = (String) list.get(0);
+          String codeUrl = "http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code=" + fundCode
+              + "&topline=10&year=2021&month=";
+          String postResult = HttpUtils.get(codeUrl);
+          if(postResult.contains("{") && postResult.contains("}")){
+            postResult = postResult.substring(postResult.indexOf("{"), postResult.lastIndexOf("}")+1);
+            JSONObject postObject = JSONUtil.parseObj(postResult);
+            String content = postObject.getStr("content");
+            if(!StringUtil.isBlank(content)) {
+              Document document = Jsoup.parse(content);
+              Elements elements = document.getElementsByTag("a");
+              AtomicInteger i = new AtomicInteger();
+              AtomicInteger j = new AtomicInteger();
+              elements.parallelStream().forEach(
+                  element -> {
+                    if (i.get() == 0) {
+                      String name = element.html();
+                      log.info("==============fund name is:{}==============", name);
+                    }
+                    //log.info("---------i:{}---------", i);
+                    if ((i.get() - 2) % 6 == 0) {
+                      j.incrementAndGet();
+                      Integer total = postMap.get(element.html());
+                      if (total == null || total == 0) {
+                        total = 1;
+                      } else {
+                        total++;
+                      }
+                      postMap.put(element.html(), total);
+                      log.info("---------post name is:{}---------", element.html());
+                    }
+                    if (j.get() == 10) {
+                      return;
+                    }
+                  }
+              );
             }
-            postMap.put(element.html(), total);
-            log.info("---------post name is:{}---------", element.html());
-          }
-          if(j==10){
-            break;
           }
         }
-        log.info("**************total is:{}****************", postMap);
-      }
-    }
-    //log.info(JSONUtil.toJsonStr(fundArray));
+    );
+    log.info("**************total is:{}****************", postMap);
   }
 }
