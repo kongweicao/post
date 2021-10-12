@@ -3,9 +3,14 @@ package com.example.springbootdemo.service;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.example.springbootdemo.util.HttpUtils;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +29,7 @@ public class DataService {
     String fundResult = HttpUtils.get(fundUrl);
     fundResult = fundResult.substring(fundResult.indexOf("["), fundResult.lastIndexOf("]")+1);
     List<List> fundArray = JSONUtil.toList(fundResult, List.class);
-    ConcurrentHashMap<String, Integer> postMap = new ConcurrentHashMap<>();
+    ConcurrentHashMap<String, AtomicInteger> postMap = new ConcurrentHashMap<>();
     fundArray.parallelStream().forEach(
         list -> {
           String fundCode = (String) list.get(0);
@@ -38,8 +43,8 @@ public class DataService {
             if(!StringUtil.isBlank(content)) {
               Document document = Jsoup.parse(content);
               Elements elements = document.getElementsByTag("a");
-              AtomicInteger i = new AtomicInteger();
-              AtomicInteger j = new AtomicInteger();
+              AtomicInteger i = new AtomicInteger(0);
+              AtomicInteger j = new AtomicInteger(0);
               elements.parallelStream().forEach(
                   element -> {
                     if (i.get() == 0) {
@@ -49,11 +54,11 @@ public class DataService {
                     //log.info("---------i:{}---------", i);
                     if ((i.get() - 2) % 6 == 0) {
                       j.incrementAndGet();
-                      Integer total = postMap.get(element.html());
-                      if (total == null || total == 0) {
-                        total = 1;
+                      AtomicInteger total = postMap.get(element.html());
+                      if (total == null || total.get() == 0) {
+                        total.set(1);
                       } else {
-                        total++;
+                        total.incrementAndGet();
                       }
                       postMap.put(element.html(), total);
                       log.info("---------post name is:{}---------", element.html());
@@ -61,6 +66,7 @@ public class DataService {
                     if (j.get() == 10) {
                       return;
                     }
+                    i.incrementAndGet();
                   }
               );
             }
